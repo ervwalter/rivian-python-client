@@ -1296,7 +1296,7 @@ requires-dist = [
     { name = "bleak", marker = "extra == 'ble'", specifier = ">=0.21" },
     { name = "cryptography", specifier = ">=41.0.1" },
     { name = "dbus-fast", marker = "sys_platform == 'linux' and extra == 'ble'", specifier = ">=2.11.0" },
-    { name = "protobuf", specifier = ">=6.33,<8" },
+    { name = "protobuf", specifier = ">=6.32,<8" },
 ]
 provides-extras = ["ble"]
 

@@ -52,4 +52,4 @@ jobs:
 
       - name: Test minimum protobuf runtime
         if: matrix.python-version == '3.14'
-        run: uv run --with 'protobuf==6.33.0' pytest
+        run: uv run --with 'protobuf==6.32.0' pytest

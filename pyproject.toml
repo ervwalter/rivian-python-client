@@ -13,7 +13,7 @@ license = "MIT"
 dependencies = [
     "aiohttp (>=3.0.0)",
     "cryptography (>=41.0.1)",
-    "protobuf (>=6.33,<8)",
+    "protobuf (>=6.32,<8)",
     "backports-strenum (>=1.2.4) ; python_version < '3.11'",
 ]
 dynamic = ["version"]
