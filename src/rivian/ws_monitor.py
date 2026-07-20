@@ -52,13 +52,16 @@ class WebSocketMonitor:
         self._connection_init = connection_init
 
         self._connection_ack: asyncio.Event = asyncio.Event()
+        self._connection_lock = asyncio.Lock()
+        self._subscription_lock = asyncio.Lock()
         self._disconnect = False
         self._ws: ClientWebSocketResponse | None = None
         self._monitor_task: asyncio.Task | None = None
         self._receiver_task: asyncio.Task | None = None
         self._last_received: datetime | None = None
         self._subscriptions: dict[
-            str, tuple[Callable[[dict[str, Any]], None], dict[str, Any]]
+            str,
+            tuple[Callable[[dict[str, Any]], Awaitable[None] | None], dict[str, Any]],
         ] = {}
 
     @property
@@ -85,35 +88,62 @@ class WebSocketMonitor:
 
     async def new_connection(self, start_monitor: bool = False) -> None:
         """Create a new connection and, optionally, start the monitor."""
-        await cancel_task(self._receiver_task)
-        self._disconnect = False
-        # pylint: disable=protected-access
-        assert self._account._session
-        self._ws = await self._account._session.ws_connect(
-            url=self._url, headers={"sec-websocket-protocol": "graphql-transport-ws"}
-        )
-        await self._connection_init(self._ws)
-        self._receiver_task = asyncio.ensure_future(self._receiver())
-        if start_monitor:
-            await self.start_monitor()
+        async with self._connection_lock:
+            if not self.connected:
+                await cancel_task(self._receiver_task)
+                self._disconnect = False
+                self._connection_ack.clear()
+                # pylint: disable=protected-access
+                assert self._account._session
+                self._ws = await self._account._session.ws_connect(
+                    url=self._url,
+                    headers={"sec-websocket-protocol": "graphql-transport-ws"},
+                )
+                await self._connection_init(self._ws)
+                self._receiver_task = asyncio.ensure_future(self._receiver())
+            if start_monitor:
+                await self.start_monitor()
 
     async def start_subscription(
-        self, payload: dict[str, Any], callback: Callable[[dict[str, Any]], None]
+        self,
+        payload: dict[str, Any],
+        callback: Callable[[dict[str, Any]], Awaitable[None] | None],
     ) -> Callable[[], Awaitable[None]] | None:
         """Start a subscription."""
         if not self.connected:
             return None
         _id = str(uuid4())
-        self._subscriptions[_id] = (callback, payload)
-        await self._subscribe(_id, payload)
+        async with async_timeout.timeout(self._account.request_timeout):
+            while True:
+                websocket = self._ws
+                await self.connection_ack.wait()
+                async with self._connection_lock:
+                    if (
+                        websocket is not self._ws
+                        or not self.connected
+                        or not self.connection_ack.is_set()
+                    ):
+                        continue
+                    async with self._subscription_lock:
+                        self._subscriptions[_id] = (callback, payload)
+                        try:
+                            await self._subscribe(_id, payload)
+                        except asyncio.CancelledError:
+                            self._subscriptions.pop(_id, None)
+                            raise
+                        except Exception:
+                            self._subscriptions.pop(_id, None)
+                            raise
+                    break
 
         async def unsubscribe() -> None:
             """Unsubscribe."""
-            if _id in self._subscriptions:
-                del self._subscriptions[_id]
-                if self.connected:
-                    assert self._ws
-                    await self._ws.send_json({"id": _id, "type": "complete"})
+            async with self._subscription_lock:
+                if _id in self._subscriptions:
+                    del self._subscriptions[_id]
+                    if self.connected:
+                        assert self._ws
+                        await self._ws.send_json({"id": _id, "type": "complete"})
 
         return unsubscribe
 
@@ -127,45 +157,78 @@ class WebSocketMonitor:
         try:
             async with async_timeout.timeout(self._account.request_timeout):
                 await self.connection_ack.wait()
-        except asyncio.TimeoutError:
-            _LOGGER.error("A timeout occurred while attempting to resubscribe")
-            return
-        for _id, (_, payload) in self._subscriptions.items():
-            await self._subscribe(_id, payload)
+        except asyncio.TimeoutError as err:
+            raise TimeoutError(
+                "Timed out waiting for WebSocket acknowledgement"
+            ) from err
+        async with self._subscription_lock:
+            subscriptions = tuple(self._subscriptions.items())
+            for _id, (_, payload) in subscriptions:
+                await self._subscribe(_id, payload)
 
     async def _receiver(self) -> None:
         """Receive a message from a web socket."""
         if not (websocket := self._ws):
             return
-        while not websocket.closed:
-            try:
-                msg = await websocket.receive(timeout=60)
-                if msg.type in (WSMsgType.CLOSE, WSMsgType.CLOSING, WSMsgType.CLOSED):
-                    self._log_message(msg)
-                    if msg.extra == "Unauthenticated":
-                        self._disconnect = True
-                    break
-                self._last_received = datetime.now(timezone.utc)
-                if msg.type == WSMsgType.TEXT:
-                    data = loads(msg.data)
-                    if (data_type := data.get("type")) == "connection_ack":
-                        self._connection_ack.set()
-                    elif data_type == "next":
-                        if (_id := data.get("id")) in self._subscriptions:
-                            _fn = self._subscriptions[_id][0]
-                            if inspect.iscoroutinefunction(_fn):
-                                await _fn(data)
-                            else:
-                                _fn(data)
-                    else:
+        try:
+            while not websocket.closed:
+                try:
+                    msg = await websocket.receive(timeout=60)
+                    if msg.type in (
+                        WSMsgType.CLOSE,
+                        WSMsgType.CLOSING,
+                        WSMsgType.CLOSED,
+                    ):
                         self._log_message(msg)
-                elif msg.type == WSMsgType.ERROR:
-                    self._log_message(msg, True)
+                        if msg.extra == "Unauthenticated":
+                            self._disconnect = True
+                        break
+                    self._last_received = datetime.now(timezone.utc)
+                    if msg.type == WSMsgType.TEXT:
+                        try:
+                            data = loads(msg.data)
+                        except (TypeError, ValueError):
+                            self._log_message(
+                                "Received malformed web socket JSON", True
+                            )
+                            continue
+                        if not isinstance(data, dict):
+                            self._log_message(
+                                "Received non-object web socket JSON", True
+                            )
+                            continue
+                        if (data_type := data.get("type")) == "connection_ack":
+                            self._connection_ack.set()
+                        elif data_type == "ping":
+                            await websocket.send_json(
+                                {"type": "pong", "payload": data.get("payload")}
+                            )
+                        elif data_type == "next":
+                            if (_id := data.get("id")) in self._subscriptions:
+                                _fn = self._subscriptions[_id][0]
+                                try:
+                                    if inspect.iscoroutinefunction(_fn):
+                                        await _fn(data)
+                                    else:
+                                        result = _fn(data)
+                                        if inspect.isawaitable(result):
+                                            await result
+                                except Exception as ex:  # pylint: disable=broad-except
+                                    self._log_exception(
+                                        "Web socket subscription callback failed", ex
+                                    )
+                        else:
+                            self._log_message(msg)
+                    elif msg.type == WSMsgType.ERROR:
+                        self._log_message(msg, True)
+                        continue
+                except asyncio.TimeoutError:
+                    # Sleeping vehicles can remain silent. Resubscribing on the same
+                    # live socket duplicates subscription IDs and is not a keepalive.
                     continue
-            except asyncio.TimeoutError:
-                await self._resubscribe_all()
-        self._connection_ack.clear()
-        self._log_message("web socket stopped")
+        finally:
+            self._connection_ack.clear()
+            self._log_message("web socket stopped")
 
     async def _monitor(self) -> None:
         """Monitor a web socket connection."""
@@ -179,15 +242,21 @@ class WebSocketMonitor:
             if not self._disconnect:
                 try:
                     await self.new_connection()
+                    if not self._ws or self._ws.closed:
+                        raise ConnectionError("Web socket did not open")
+                    await self._resubscribe_all()
                 except Exception as ex:  # pylint: disable=broad-except
-                    self._log_message(ex, True)
-                if not self._ws or self._ws.closed:
+                    self._log_exception("Web socket reconnect failed", ex)
+                    if self._ws and not self._ws.closed:
+                        try:
+                            await self._ws.close()
+                        except Exception as close_ex:  # pylint: disable=broad-except
+                            self._log_exception("Web socket close failed", close_ex)
                     await asyncio.sleep(min(1 * 2**attempt + uniform(0, 1), 300))
                     attempt += 1
                     continue
                 attempt = 0
                 self._log_message("web socket connection reopened")
-                await self._resubscribe_all()
 
     async def start_monitor(self) -> None:
         """Start or restart the monitor task."""
@@ -211,3 +280,7 @@ class WebSocketMonitor:
         """Log a message."""
         log_method = _LOGGER.error if is_error else _LOGGER.debug
         log_method(message)
+
+    def _log_exception(self, context: str, exception: Exception) -> None:
+        """Log exception type without potentially sensitive exception details."""
+        _LOGGER.error("%s (%s)", context, type(exception).__name__)

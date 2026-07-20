@@ -39,3 +39,7 @@ class RivianPhoneLimitReachedError(RivianApiException):
 
 class RivianBadRequestError(RivianApiException):
     """Rivian API bad request."""
+
+
+class ParallaxDecodeError(ValueError):
+    """A Parallax protobuf payload could not be decoded."""

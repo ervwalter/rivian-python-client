@@ -1,0 +1,124 @@
+syntax = "proto3";
+
+package rivian.parallax.internal;
+
+// These minimal message definitions describe fields corroborated by captured
+// Parallax traffic. Integer state values intentionally remain numeric until
+// their meanings have been verified across vehicles and state transitions.
+
+message BatteryChargeState {
+  optional double soc_percent = 1;
+  optional double pack_kwh = 2;
+  optional float range_km = 3;
+}
+
+message BatteryTemperatureState {
+  optional float cell_average_c = 1;
+  optional float cell_max_c = 2;
+  optional float cell_min_c = 3;
+}
+
+message HighVoltageBatteryState {
+  optional BatteryChargeState charge_state = 1;
+  optional BatteryTemperatureState temperature_state = 2;
+  optional int32 power_output_code = 4;
+  optional bool requires_calibration = 5;
+  optional int32 cold_weather_state_code = 6;
+}
+
+message VehicleRange {
+  optional int32 distance_km = 1;
+}
+
+message VehicleOdometer {
+  optional int64 distance_km = 1;
+}
+
+message VehicleGnss {
+  optional double latitude = 1;
+  optional double longitude = 2;
+  optional double altitude_m = 3;
+  optional int64 timestamp_ms = 10;
+}
+
+message VehiclePowerState {
+  optional int32 state_code = 1;
+}
+
+message VehicleGear {
+  optional int32 state_code = 1;
+}
+
+message VehicleDriveMode {
+  optional int32 mode_code = 1;
+}
+
+message TireState {
+  optional int32 position_code = 1;
+  optional int32 status_code = 2;
+  optional double pressure_bar = 3;
+  optional int32 validity_code = 4;
+  optional int64 timestamp_ms = 5;
+}
+
+message TireStates {
+  optional int32 monitor_status_code = 1;
+  repeated TireState tires = 2;
+}
+
+message BodyState {
+  optional int32 position_code = 1;
+  optional int32 state_code = 2;
+}
+
+message BodyStates {
+  repeated BodyState states = 1;
+}
+
+message CabinPreconditioningStatus {
+  optional int32 status_code = 1;
+  optional int32 type_code = 2;
+}
+
+message CabinTemperatures {
+  optional float interior_c = 3;
+}
+
+message ChargingSessionStatus {
+  optional int32 plug_connection_status_code = 1;
+  optional int32 display_status_code = 2;
+  optional int32 evse_type_code = 3;
+}
+
+message ChargingTimeEstimation {
+  optional int32 estimated_minutes_remaining = 2;
+}
+
+message ChargingSessionLiveData {
+  optional float total_kwh = 1;
+  optional float pack_kwh = 2;
+  optional float thermal_kwh = 3;
+  optional float outlets_kwh = 4;
+  optional float system_kwh = 5;
+  optional int32 session_duration_minutes = 6;
+  optional int32 time_remaining_minutes = 7;
+  optional int32 range_added_km = 8;
+  optional float current_power_kw = 9;
+  optional int32 current_range_km_per_hour = 10;
+  optional bool is_free_session = 12;
+  optional int32 charging_state_code = 13;
+}
+
+message ChargingGraphBar {
+  optional int32 soc_percent = 1;
+  optional float power_kw = 2;
+  optional int64 start_time_ms = 3;
+  optional int64 end_time_ms = 4;
+  optional int32 time_estimation_validity_code = 5;
+  optional int32 charging_state_code = 6;
+  optional int32 context_code = 7;
+}
+
+message ChargingGraph {
+  repeated ChargingGraphBar bars = 1;
+}

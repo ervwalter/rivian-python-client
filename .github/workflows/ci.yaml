@@ -43,5 +43,13 @@ jobs:
       - name: Run mypy
         run: uv run mypy src/rivian
 
+      - name: Verify generated protobuf modules
+        if: matrix.python-version == '3.14'
+        run: uv run python scripts/generate_proto.py --check
+
       - name: Test with pytest
         run: uv run pytest
+
+      - name: Test minimum protobuf runtime
+        if: matrix.python-version == '3.14'
+        run: uv run --with 'protobuf==6.33.0' pytest

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
+import inspect
 import logging
 import socket
 import sys
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable, Collection
 from typing import Any, Type
 from warnings import warn
 
@@ -33,6 +36,7 @@ from .exceptions import (
     RivianTemporarilyLockedError,
     RivianUnauthenticated,
 )
+from .parallax import ParallaxMessage
 from .utils import generate_vehicle_command_hmac
 from .ws_monitor import WebSocketMonitor
 
@@ -133,6 +137,7 @@ class Rivian:
         self._otp_token = ""
 
         self._ws_monitor: WebSocketMonitor | None = None
+        self._ws_connect_lock = asyncio.Lock()
         self._subscriptions: dict[str, str] = {}
 
     async def create_csrf_token(self) -> None:
@@ -620,6 +625,74 @@ class Rivian:
             _LOGGER.error(ex)
             return None
 
+    async def subscribe_for_parallax_messages(
+        self,
+        vehicle_id: str,
+        rvms: Collection[str],
+        callback: Callable[[ParallaxMessage], Awaitable[None] | None],
+    ) -> Callable[[], Awaitable[None]] | None:
+        """Subscribe to raw protobuf telemetry for an explicit set of RVMs."""
+        if not vehicle_id:
+            raise ValueError("vehicle_id must not be empty")
+        if isinstance(rvms, (str, bytes)) or not rvms:
+            raise ValueError("rvms must be a nonempty collection of topic strings")
+        topics = tuple(dict.fromkeys(rvms))
+        if any(not isinstance(topic, str) or not topic for topic in topics):
+            raise ValueError("rvms must contain only nonempty topic strings")
+
+        async def handle_frame(frame: dict[str, Any]) -> None:
+            envelope = frame.get("payload")
+            if not isinstance(envelope, dict):
+                return
+            data = envelope.get("data")
+            if not isinstance(data, dict):
+                return
+            parallax = data.get("parallaxMessages")
+            if not isinstance(parallax, dict):
+                return
+            rvm = parallax.get("rvm")
+            encoded_payload = parallax.get("payload")
+            if not isinstance(rvm, str) or not isinstance(encoded_payload, str):
+                return
+            try:
+                payload = base64.b64decode(encoded_payload, validate=True)
+            except (binascii.Error, ValueError):
+                _LOGGER.warning("Discarding malformed Parallax payload for %s", rvm)
+                return
+            timestamp = parallax.get("timestamp")
+            try:
+                timestamp_ms = int(timestamp) if timestamp is not None else None
+            except (TypeError, ValueError):
+                timestamp_ms = None
+            result = callback(
+                ParallaxMessage(
+                    rvm=rvm,
+                    timestamp_ms=timestamp_ms,
+                    payload=payload,
+                )
+            )
+            if inspect.isawaitable(result):
+                await result
+
+        try:
+            await self._ws_connect()
+            assert self._ws_monitor
+            async with async_timeout.timeout(self.request_timeout):
+                await self._ws_monitor.connection_ack.wait()
+            payload = {
+                "operationName": "ParallaxMessages",
+                "query": "subscription ParallaxMessages($vehicleId: String!, $rvms: [String!]) { parallaxMessages(vehicleId: $vehicleId, rvms: $rvms) { payload timestamp rvm } }",
+                "variables": {"vehicleId": vehicle_id, "rvms": list(topics)},
+            }
+            unsubscribe = await self._ws_monitor.start_subscription(
+                payload, handle_frame
+            )
+            _LOGGER.debug("%s subscribed to %d Parallax RVMs", vehicle_id, len(topics))
+            return unsubscribe
+        except Exception as ex:  # pylint: disable=broad-except
+            _LOGGER.error("Parallax subscription setup failed (%s)", type(ex).__name__)
+            return None
+
     async def _ws_connect(self) -> ClientWebSocketResponse:
         """Initiate a websocket connection."""
 
@@ -636,17 +709,21 @@ class Rivian:
                 }
             )
 
-        if not self._ws_monitor:
-            self._ws_monitor = WebSocketMonitor(
-                self, GRAPHQL_WEBSOCKET, connection_init
-            )
-        ws_monitor = self._ws_monitor
-        if ws_monitor.websocket is None or ws_monitor.websocket.closed:
-            await ws_monitor.new_connection(True)
-            assert ws_monitor.websocket
-        if ws_monitor.monitor is None or ws_monitor.monitor.done():
-            await ws_monitor.start_monitor()
-        return ws_monitor.websocket
+        async with self._ws_connect_lock:
+            if self._session is None:
+                self._session = aiohttp.ClientSession()
+                self._close_session = True
+            if not self._ws_monitor:
+                self._ws_monitor = WebSocketMonitor(
+                    self, GRAPHQL_WEBSOCKET, connection_init
+                )
+            ws_monitor = self._ws_monitor
+            if ws_monitor.websocket is None or ws_monitor.websocket.closed:
+                await ws_monitor.new_connection(True)
+                assert ws_monitor.websocket
+            if ws_monitor.monitor is None or ws_monitor.monitor.done():
+                await ws_monitor.start_monitor()
+            return ws_monitor.websocket
 
     async def __graphql_query(
         self, headers: dict[str, str], url: str, body: dict[str, Any]
