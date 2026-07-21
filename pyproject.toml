@@ -58,6 +58,7 @@ cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true 
 
 [tool.uv-dynamic-versioning]
 pattern = "default-unprefixed"
+tagged-metadata = true
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
