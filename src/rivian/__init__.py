@@ -1,5 +1,6 @@
 """Asynchronous Python client for the Rivian API."""
 
+from .__version__ import __version__
 from .const import VehicleCommand
 from .exceptions import ParallaxDecodeError
 from .parallax import (
@@ -67,6 +68,7 @@ __all__ = [
     "VehicleOdometer",
     "VehiclePowerState",
     "VehicleRange",
+    "__version__",
     "decode_body_states",
     "decode_cabin_preconditioning_status",
     "decode_cabin_temperatures",
