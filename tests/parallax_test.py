@@ -37,12 +37,13 @@ def payload(encoded: str) -> bytes:
 
 
 def test_decode_high_voltage_battery_state() -> None:
-    """Decode observed SOC, energy, temperature, and state fields."""
+    """Decode observed SOC, capacity, temperature, and state fields."""
     state = decode_high_voltage_battery_state(
         payload("ChIJAAAAoJmZVUARAAAAoEfhVkASDw00M/tBFWdm/kEdNDPrQRoAIAEwBA==")
     )
     assert math.isclose(state.soc_percent or 0, 86.4, rel_tol=1e-5)
-    assert math.isclose(state.pack_kwh or 0, 91.52, rel_tol=1e-5)
+    assert math.isclose(state.capacity_kwh or 0, 91.52, rel_tol=1e-5)
+    assert state.pack_kwh == state.capacity_kwh
     assert state.range_km is None
     assert math.isclose(state.cell_average_c or 0, 31.4, rel_tol=1e-5)
     assert math.isclose(state.cell_max_c or 0, 31.8, rel_tol=1e-5)
@@ -63,7 +64,8 @@ def test_decode_vehicle_dynamics() -> None:
     assert math.isclose(gnss.latitude or 0, 40.0)
     assert math.isclose(gnss.longitude or 0, -75.0)
     assert math.isclose(gnss.altitude_m or 0, 123.5)
-    assert gnss.timestamp_ms == 1_700_000_000_000
+    assert gnss.gps_timestamp_ms == 1_700_000_000_000
+    assert gnss.timestamp_ms == 2_015_964_782_000
     assert decode_vehicle_power_state(payload("CAM=")).state_code == 3
     assert decode_vehicle_gear(payload("CAE=")).state_code == 1
     assert decode_vehicle_drive_mode(payload("CAI=")).mode_code == 2
@@ -352,4 +354,4 @@ def test_unknown_nested_field_is_ignored() -> None:
     decoded = decode_high_voltage_battery_state(encoded)
 
     assert math.isclose(decoded.soc_percent or 0, 86.4, rel_tol=1e-5)
-    assert decoded.pack_kwh is None
+    assert decoded.capacity_kwh is None

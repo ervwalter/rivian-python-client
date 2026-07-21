@@ -8,7 +8,7 @@ package rivian.parallax.internal;
 
 message BatteryChargeState {
   optional double soc_percent = 1;
-  optional double pack_kwh = 2;
+  optional double capacity_kwh = 2;
   optional float range_km = 3;
 }
 
@@ -38,7 +38,7 @@ message VehicleGnss {
   optional double latitude = 1;
   optional double longitude = 2;
   optional double altitude_m = 3;
-  optional int64 timestamp_ms = 10;
+  optional int64 gps_timestamp_ms = 10;
 }
 
 message VehiclePowerState {

@@ -26,7 +26,7 @@ class HighVoltageBatteryState:
     """High-voltage battery telemetry."""
 
     soc_percent: float | None
-    pack_kwh: float | None
+    capacity_kwh: float | None
     range_km: float | None
     cell_average_c: float | None
     cell_max_c: float | None
@@ -34,6 +34,11 @@ class HighVoltageBatteryState:
     power_output_code: int | None
     requires_calibration: bool | None
     cold_weather_state_code: int | None
+
+    @property
+    def pack_kwh(self) -> float | None:
+        """Return the deprecated capacity field alias."""
+        return self.capacity_kwh
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +63,7 @@ class VehicleGnss:
     longitude: float | None
     altitude_m: float | None
     timestamp_ms: int | None
+    gps_timestamp_ms: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -218,6 +224,13 @@ def _optional(message: Message, field: str) -> Any | None:
     return getattr(message, field) if message.HasField(field) else None
 
 
+def _gps_to_unix_timestamp_ms(timestamp_ms: int | None) -> int | None:
+    """Convert a current GPS-epoch timestamp to the Unix epoch in UTC."""
+    if timestamp_ms is None:
+        return None
+    return timestamp_ms + 315_964_800_000 - 18_000
+
+
 def decode_high_voltage_battery_state(payload: bytes) -> HighVoltageBatteryState:
     """Decode ``energy.high_voltage.battery_state``."""
     message = _parse(payload, parallax_pb2.HighVoltageBatteryState)
@@ -227,7 +240,9 @@ def decode_high_voltage_battery_state(payload: bytes) -> HighVoltageBatteryState
     )
     return HighVoltageBatteryState(
         soc_percent=_optional(charge_state, "soc_percent") if charge_state else None,
-        pack_kwh=_optional(charge_state, "pack_kwh") if charge_state else None,
+        capacity_kwh=(
+            _optional(charge_state, "capacity_kwh") if charge_state else None
+        ),
         range_km=_optional(charge_state, "range_km") if charge_state else None,
         cell_average_c=(
             _optional(temperature_state, "cell_average_c")
@@ -263,11 +278,13 @@ def decode_vehicle_odometer(payload: bytes) -> VehicleOdometer:
 def decode_vehicle_gnss(payload: bytes) -> VehicleGnss:
     """Decode ``dynamics.vehicle.gnss``."""
     message = _parse(payload, parallax_pb2.VehicleGnss)
+    gps_timestamp_ms = _optional(message, "gps_timestamp_ms")
     return VehicleGnss(
         latitude=_optional(message, "latitude"),
         longitude=_optional(message, "longitude"),
         altitude_m=_optional(message, "altitude_m"),
-        timestamp_ms=_optional(message, "timestamp_ms"),
+        timestamp_ms=_gps_to_unix_timestamp_ms(gps_timestamp_ms),
+        gps_timestamp_ms=gps_timestamp_ms,
     )
 
 

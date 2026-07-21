@@ -7,14 +7,14 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class BatteryChargeState(_message.Message):
-    __slots__ = ("soc_percent", "pack_kwh", "range_km")
+    __slots__ = ("soc_percent", "capacity_kwh", "range_km")
     SOC_PERCENT_FIELD_NUMBER: _ClassVar[int]
-    PACK_KWH_FIELD_NUMBER: _ClassVar[int]
+    CAPACITY_KWH_FIELD_NUMBER: _ClassVar[int]
     RANGE_KM_FIELD_NUMBER: _ClassVar[int]
     soc_percent: float
-    pack_kwh: float
+    capacity_kwh: float
     range_km: float
-    def __init__(self, soc_percent: _Optional[float] = ..., pack_kwh: _Optional[float] = ..., range_km: _Optional[float] = ...) -> None: ...
+    def __init__(self, soc_percent: _Optional[float] = ..., capacity_kwh: _Optional[float] = ..., range_km: _Optional[float] = ...) -> None: ...
 
 class BatteryTemperatureState(_message.Message):
     __slots__ = ("cell_average_c", "cell_max_c", "cell_min_c")
@@ -53,16 +53,16 @@ class VehicleOdometer(_message.Message):
     def __init__(self, distance_km: _Optional[int] = ...) -> None: ...
 
 class VehicleGnss(_message.Message):
-    __slots__ = ("latitude", "longitude", "altitude_m", "timestamp_ms")
+    __slots__ = ("latitude", "longitude", "altitude_m", "gps_timestamp_ms")
     LATITUDE_FIELD_NUMBER: _ClassVar[int]
     LONGITUDE_FIELD_NUMBER: _ClassVar[int]
     ALTITUDE_M_FIELD_NUMBER: _ClassVar[int]
-    TIMESTAMP_MS_FIELD_NUMBER: _ClassVar[int]
+    GPS_TIMESTAMP_MS_FIELD_NUMBER: _ClassVar[int]
     latitude: float
     longitude: float
     altitude_m: float
-    timestamp_ms: int
-    def __init__(self, latitude: _Optional[float] = ..., longitude: _Optional[float] = ..., altitude_m: _Optional[float] = ..., timestamp_ms: _Optional[int] = ...) -> None: ...
+    gps_timestamp_ms: int
+    def __init__(self, latitude: _Optional[float] = ..., longitude: _Optional[float] = ..., altitude_m: _Optional[float] = ..., gps_timestamp_ms: _Optional[int] = ...) -> None: ...
 
 class VehiclePowerState(_message.Message):
     __slots__ = ("state_code",)
