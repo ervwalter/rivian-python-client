@@ -73,3 +73,9 @@ bytes. Typed decoding is a separate opt-in step and raises
 `ParallaxDecodeError` for malformed or unsupported payloads. Numeric state and
 position codes remain integers where live transitions have not established
 stable enum labels.
+
+The typed decoders include direct GNSS speed and heading as well as active-trip
+destination, estimated arrival, remaining distance, remaining drive time, and
+the higher-frequency position carried by navigation progress. These values are
+exposed with their wire units and timestamps; the client does not derive trip
+efficiency or Home Assistant state semantics.
