@@ -38,7 +38,52 @@ message VehicleGnss {
   optional double latitude = 1;
   optional double longitude = 2;
   optional double altitude_m = 3;
+  optional float speed_m_s = 4;
+  optional float heading_deg = 5;
   optional int64 gps_timestamp_ms = 10;
+}
+
+message NavigationCoordinates {
+  optional double latitude = 1;
+  optional double longitude = 2;
+}
+
+message NavigationMotion {
+  optional NavigationCoordinates coordinates = 1;
+  optional float speed_m_s = 2;
+  optional float heading_deg = 3;
+  optional int64 timestamp_ms = 5;
+}
+
+message NavigationTripProgress {
+  optional double remaining_distance_m = 4;
+  optional double remaining_drive_time_s = 5;
+  optional NavigationMotion motion = 6;
+}
+
+message NavigationPlace {
+  optional NavigationCoordinates coordinates = 1;
+  optional int32 kind_code = 3;
+  optional string name = 4;
+  optional string place_id = 5;
+}
+
+message NavigationStop {
+  optional NavigationPlace place = 1;
+}
+
+message NavigationRoute {
+  repeated NavigationStop stops = 3;
+}
+
+message NavigationTimestampSeconds {
+  optional int64 seconds = 1;
+}
+
+message NavigationTripInfo {
+  optional string trip_id = 1;
+  optional NavigationRoute route = 3;
+  optional NavigationTimestampSeconds eta = 6;
 }
 
 message VehiclePowerState {

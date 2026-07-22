@@ -62,8 +62,41 @@ class VehicleGnss:
     latitude: float | None
     longitude: float | None
     altitude_m: float | None
+    speed_m_s: float | None
+    heading_deg: float | None
     timestamp_ms: int | None
     gps_timestamp_ms: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class NavigationMotion:
+    """Current motion nested in active navigation progress."""
+
+    latitude: float | None
+    longitude: float | None
+    speed_m_s: float | None
+    heading_deg: float | None
+    timestamp_ms: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class NavigationTripProgress:
+    """Progress for the active vehicle navigation route."""
+
+    remaining_distance_m: float | None
+    remaining_drive_time_s: float | None
+    motion: NavigationMotion | None
+
+
+@dataclass(frozen=True, slots=True)
+class NavigationTripInfo:
+    """Verified summary fields for the active navigation route."""
+
+    trip_id: str | None
+    destination_name: str | None
+    destination_latitude: float | None
+    destination_longitude: float | None
+    eta_timestamp_ms: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,6 +228,8 @@ ParallaxData = (
     | VehicleRange
     | VehicleOdometer
     | VehicleGnss
+    | NavigationTripProgress
+    | NavigationTripInfo
     | VehiclePowerState
     | VehicleGear
     | VehicleDriveMode
@@ -283,8 +318,67 @@ def decode_vehicle_gnss(payload: bytes) -> VehicleGnss:
         latitude=_optional(message, "latitude"),
         longitude=_optional(message, "longitude"),
         altitude_m=_optional(message, "altitude_m"),
+        speed_m_s=_optional(message, "speed_m_s"),
+        heading_deg=_optional(message, "heading_deg"),
         timestamp_ms=_gps_to_unix_timestamp_ms(gps_timestamp_ms),
         gps_timestamp_ms=gps_timestamp_ms,
+    )
+
+
+def decode_navigation_trip_progress(payload: bytes) -> NavigationTripProgress:
+    """Decode ``navigation.navigation_service.trip_progress``."""
+    message = _parse(payload, parallax_pb2.NavigationTripProgress)
+    motion_message = message.motion if message.HasField("motion") else None
+    coordinates = (
+        motion_message.coordinates
+        if motion_message and motion_message.HasField("coordinates")
+        else None
+    )
+    motion = (
+        NavigationMotion(
+            latitude=_optional(coordinates, "latitude") if coordinates else None,
+            longitude=_optional(coordinates, "longitude") if coordinates else None,
+            speed_m_s=_optional(motion_message, "speed_m_s"),
+            heading_deg=_optional(motion_message, "heading_deg"),
+            timestamp_ms=_optional(motion_message, "timestamp_ms"),
+        )
+        if motion_message
+        else None
+    )
+    return NavigationTripProgress(
+        remaining_distance_m=_optional(message, "remaining_distance_m"),
+        remaining_drive_time_s=_optional(message, "remaining_drive_time_s"),
+        motion=motion,
+    )
+
+
+def decode_navigation_trip_info(payload: bytes) -> NavigationTripInfo:
+    """Decode verified fields from ``navigation.navigation_service.trip_info``."""
+    message = _parse(payload, parallax_pb2.NavigationTripInfo)
+    places = (
+        [stop.place for stop in message.route.stops if stop.HasField("place")]
+        if message.HasField("route")
+        else []
+    )
+    destination = places[-1] if places else None
+    coordinates = (
+        destination.coordinates
+        if destination and destination.HasField("coordinates")
+        else None
+    )
+    eta_seconds = _optional(message.eta, "seconds") if message.HasField("eta") else None
+    return NavigationTripInfo(
+        trip_id=_optional(message, "trip_id"),
+        destination_name=(
+            _optional(destination, "name") if destination is not None else None
+        ),
+        destination_latitude=(
+            _optional(coordinates, "latitude") if coordinates else None
+        ),
+        destination_longitude=(
+            _optional(coordinates, "longitude") if coordinates else None
+        ),
+        eta_timestamp_ms=eta_seconds * 1000 if eta_seconds is not None else None,
     )
 
 
@@ -420,6 +514,8 @@ _DECODERS: dict[str, Callable[[bytes], ParallaxData]] = {
     "dynamics.vehicle.range": decode_vehicle_range,
     "dynamics.vehicle.odometer": decode_vehicle_odometer,
     "dynamics.vehicle.gnss": decode_vehicle_gnss,
+    "navigation.navigation_service.trip_progress": decode_navigation_trip_progress,
+    "navigation.navigation_service.trip_info": decode_navigation_trip_info,
     "vehicle.power.state": decode_vehicle_power_state,
     "dynamics.vehicle.gear": decode_vehicle_gear,
     "dynamics.vehicle.drive_mode": decode_vehicle_drive_mode,

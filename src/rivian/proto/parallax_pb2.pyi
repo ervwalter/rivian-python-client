@@ -53,16 +53,90 @@ class VehicleOdometer(_message.Message):
     def __init__(self, distance_km: _Optional[int] = ...) -> None: ...
 
 class VehicleGnss(_message.Message):
-    __slots__ = ("latitude", "longitude", "altitude_m", "gps_timestamp_ms")
+    __slots__ = ("latitude", "longitude", "altitude_m", "speed_m_s", "heading_deg", "gps_timestamp_ms")
     LATITUDE_FIELD_NUMBER: _ClassVar[int]
     LONGITUDE_FIELD_NUMBER: _ClassVar[int]
     ALTITUDE_M_FIELD_NUMBER: _ClassVar[int]
+    SPEED_M_S_FIELD_NUMBER: _ClassVar[int]
+    HEADING_DEG_FIELD_NUMBER: _ClassVar[int]
     GPS_TIMESTAMP_MS_FIELD_NUMBER: _ClassVar[int]
     latitude: float
     longitude: float
     altitude_m: float
+    speed_m_s: float
+    heading_deg: float
     gps_timestamp_ms: int
-    def __init__(self, latitude: _Optional[float] = ..., longitude: _Optional[float] = ..., altitude_m: _Optional[float] = ..., gps_timestamp_ms: _Optional[int] = ...) -> None: ...
+    def __init__(self, latitude: _Optional[float] = ..., longitude: _Optional[float] = ..., altitude_m: _Optional[float] = ..., speed_m_s: _Optional[float] = ..., heading_deg: _Optional[float] = ..., gps_timestamp_ms: _Optional[int] = ...) -> None: ...
+
+class NavigationCoordinates(_message.Message):
+    __slots__ = ("latitude", "longitude")
+    LATITUDE_FIELD_NUMBER: _ClassVar[int]
+    LONGITUDE_FIELD_NUMBER: _ClassVar[int]
+    latitude: float
+    longitude: float
+    def __init__(self, latitude: _Optional[float] = ..., longitude: _Optional[float] = ...) -> None: ...
+
+class NavigationMotion(_message.Message):
+    __slots__ = ("coordinates", "speed_m_s", "heading_deg", "timestamp_ms")
+    COORDINATES_FIELD_NUMBER: _ClassVar[int]
+    SPEED_M_S_FIELD_NUMBER: _ClassVar[int]
+    HEADING_DEG_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_MS_FIELD_NUMBER: _ClassVar[int]
+    coordinates: NavigationCoordinates
+    speed_m_s: float
+    heading_deg: float
+    timestamp_ms: int
+    def __init__(self, coordinates: _Optional[_Union[NavigationCoordinates, _Mapping]] = ..., speed_m_s: _Optional[float] = ..., heading_deg: _Optional[float] = ..., timestamp_ms: _Optional[int] = ...) -> None: ...
+
+class NavigationTripProgress(_message.Message):
+    __slots__ = ("remaining_distance_m", "remaining_drive_time_s", "motion")
+    REMAINING_DISTANCE_M_FIELD_NUMBER: _ClassVar[int]
+    REMAINING_DRIVE_TIME_S_FIELD_NUMBER: _ClassVar[int]
+    MOTION_FIELD_NUMBER: _ClassVar[int]
+    remaining_distance_m: float
+    remaining_drive_time_s: float
+    motion: NavigationMotion
+    def __init__(self, remaining_distance_m: _Optional[float] = ..., remaining_drive_time_s: _Optional[float] = ..., motion: _Optional[_Union[NavigationMotion, _Mapping]] = ...) -> None: ...
+
+class NavigationPlace(_message.Message):
+    __slots__ = ("coordinates", "kind_code", "name", "place_id")
+    COORDINATES_FIELD_NUMBER: _ClassVar[int]
+    KIND_CODE_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    PLACE_ID_FIELD_NUMBER: _ClassVar[int]
+    coordinates: NavigationCoordinates
+    kind_code: int
+    name: str
+    place_id: str
+    def __init__(self, coordinates: _Optional[_Union[NavigationCoordinates, _Mapping]] = ..., kind_code: _Optional[int] = ..., name: _Optional[str] = ..., place_id: _Optional[str] = ...) -> None: ...
+
+class NavigationStop(_message.Message):
+    __slots__ = ("place",)
+    PLACE_FIELD_NUMBER: _ClassVar[int]
+    place: NavigationPlace
+    def __init__(self, place: _Optional[_Union[NavigationPlace, _Mapping]] = ...) -> None: ...
+
+class NavigationRoute(_message.Message):
+    __slots__ = ("stops",)
+    STOPS_FIELD_NUMBER: _ClassVar[int]
+    stops: _containers.RepeatedCompositeFieldContainer[NavigationStop]
+    def __init__(self, stops: _Optional[_Iterable[_Union[NavigationStop, _Mapping]]] = ...) -> None: ...
+
+class NavigationTimestampSeconds(_message.Message):
+    __slots__ = ("seconds",)
+    SECONDS_FIELD_NUMBER: _ClassVar[int]
+    seconds: int
+    def __init__(self, seconds: _Optional[int] = ...) -> None: ...
+
+class NavigationTripInfo(_message.Message):
+    __slots__ = ("trip_id", "route", "eta")
+    TRIP_ID_FIELD_NUMBER: _ClassVar[int]
+    ROUTE_FIELD_NUMBER: _ClassVar[int]
+    ETA_FIELD_NUMBER: _ClassVar[int]
+    trip_id: str
+    route: NavigationRoute
+    eta: NavigationTimestampSeconds
+    def __init__(self, trip_id: _Optional[str] = ..., route: _Optional[_Union[NavigationRoute, _Mapping]] = ..., eta: _Optional[_Union[NavigationTimestampSeconds, _Mapping]] = ...) -> None: ...
 
 class VehiclePowerState(_message.Message):
     __slots__ = ("state_code",)
