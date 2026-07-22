@@ -206,6 +206,70 @@ class CabinTemperatures(_message.Message):
     interior_c: float
     def __init__(self, interior_c: _Optional[float] = ...) -> None: ...
 
+class HvacSettingsStatus(_message.Message):
+    __slots__ = ("target_temperature_c",)
+    TARGET_TEMPERATURE_C_FIELD_NUMBER: _ClassVar[int]
+    target_temperature_c: float
+    def __init__(self, target_temperature_c: _Optional[float] = ...) -> None: ...
+
+class PetModeStatus(_message.Message):
+    __slots__ = ("state_code", "temperature_status_code")
+    STATE_CODE_FIELD_NUMBER: _ClassVar[int]
+    TEMPERATURE_STATUS_CODE_FIELD_NUMBER: _ClassVar[int]
+    state_code: int
+    temperature_status_code: int
+    def __init__(self, state_code: _Optional[int] = ..., temperature_status_code: _Optional[int] = ...) -> None: ...
+
+class CabinVentilationSetting(_message.Message):
+    __slots__ = ("setting_code",)
+    SETTING_CODE_FIELD_NUMBER: _ClassVar[int]
+    setting_code: int
+    def __init__(self, setting_code: _Optional[int] = ...) -> None: ...
+
+class ClimateHoldSetting(_message.Message):
+    __slots__ = ("duration_seconds",)
+    DURATION_SECONDS_FIELD_NUMBER: _ClassVar[int]
+    duration_seconds: int
+    def __init__(self, duration_seconds: _Optional[int] = ...) -> None: ...
+
+class TimestampSeconds(_message.Message):
+    __slots__ = ("seconds",)
+    SECONDS_FIELD_NUMBER: _ClassVar[int]
+    seconds: int
+    def __init__(self, seconds: _Optional[int] = ...) -> None: ...
+
+class ClimateHoldStatus(_message.Message):
+    __slots__ = ("status_code", "availability_code", "unavailability_reason_code", "hold_end_time")
+    STATUS_CODE_FIELD_NUMBER: _ClassVar[int]
+    AVAILABILITY_CODE_FIELD_NUMBER: _ClassVar[int]
+    UNAVAILABILITY_REASON_CODE_FIELD_NUMBER: _ClassVar[int]
+    HOLD_END_TIME_FIELD_NUMBER: _ClassVar[int]
+    status_code: int
+    availability_code: int
+    unavailability_reason_code: int
+    hold_end_time: TimestampSeconds
+    def __init__(self, status_code: _Optional[int] = ..., availability_code: _Optional[int] = ..., unavailability_reason_code: _Optional[int] = ..., hold_end_time: _Optional[_Union[TimestampSeconds, _Mapping]] = ...) -> None: ...
+
+class DefrostDefogStatus(_message.Message):
+    __slots__ = ("status_code",)
+    STATUS_CODE_FIELD_NUMBER: _ClassVar[int]
+    status_code: int
+    def __init__(self, status_code: _Optional[int] = ...) -> None: ...
+
+class SeatConditioningState(_message.Message):
+    __slots__ = ("component_code", "conditioning_type_code")
+    COMPONENT_CODE_FIELD_NUMBER: _ClassVar[int]
+    CONDITIONING_TYPE_CODE_FIELD_NUMBER: _ClassVar[int]
+    component_code: int
+    conditioning_type_code: int
+    def __init__(self, component_code: _Optional[int] = ..., conditioning_type_code: _Optional[int] = ...) -> None: ...
+
+class SeatConditioningStates(_message.Message):
+    __slots__ = ("states",)
+    STATES_FIELD_NUMBER: _ClassVar[int]
+    states: _containers.RepeatedCompositeFieldContainer[SeatConditioningState]
+    def __init__(self, states: _Optional[_Iterable[_Union[SeatConditioningState, _Mapping]]] = ...) -> None: ...
+
 class ChargingSessionStatus(_message.Message):
     __slots__ = ("plug_connection_status_code", "display_status_code", "evse_type_code")
     PLUG_CONNECTION_STATUS_CODE_FIELD_NUMBER: _ClassVar[int]

@@ -9,20 +9,32 @@ import struct
 import pytest
 from rivian import (
     CabinPreconditioningStatus,
+    CabinVentilationSetting,
+    ClimateHoldSetting,
+    DefrostDefogStatus,
+    HvacSettingsStatus,
     ParallaxDecodeError,
     ParallaxMessage,
+    PetModeStatus,
     decode_body_states,
     decode_cabin_preconditioning_status,
     decode_cabin_temperatures,
+    decode_cabin_ventilation_setting,
     decode_charging_graph_global,
     decode_charging_session_live_data,
     decode_charging_session_status,
     decode_charging_time_estimation,
+    decode_climate_hold_setting,
+    decode_climate_hold_status,
+    decode_defrost_defog_status,
     decode_high_voltage_battery_state,
+    decode_hvac_settings_status,
     decode_navigation_trip_info,
     decode_navigation_trip_progress,
     decode_parallax_message,
     decode_parallax_payload,
+    decode_pet_mode_status,
+    decode_seat_conditioning_states,
     decode_tire_states,
     decode_vehicle_drive_mode,
     decode_vehicle_gear,
@@ -148,6 +160,51 @@ def test_decode_body_and_climate() -> None:
         27.8,
         rel_tol=1e-5,
     )
+
+
+def test_decode_observed_comfort_topics() -> None:
+    """Decode captured read-only comfort settings and status payloads."""
+    assert decode_hvac_settings_status(payload("DQAAvEE=")) == HvacSettingsStatus(
+        target_temperature_c=23.5
+    )
+    assert decode_pet_mode_status(payload("CAI=")) == PetModeStatus(
+        state_code=2,
+        temperature_status_code=None,
+    )
+    assert decode_pet_mode_status(payload("GAI=")) == PetModeStatus(
+        state_code=None,
+        temperature_status_code=2,
+    )
+    assert decode_cabin_ventilation_setting(payload("CAE=")) == (
+        CabinVentilationSetting(setting_code=1)
+    )
+    assert decode_climate_hold_setting(payload("CKA4")) == ClimateHoldSetting(
+        duration_seconds=7200
+    )
+    assert decode_defrost_defog_status(payload("CAQ=")) == DefrostDefogStatus(
+        status_code=4
+    )
+
+    hold_status = decode_climate_hold_status(payload("IgYIhOnPqgY="))
+    assert hold_status.status_code is None
+    assert hold_status.availability_code is None
+    assert hold_status.unavailability_reason_code is None
+    assert hold_status.hold_end_timestamp_ms == 1_700_000_900_000
+
+    seats = decode_seat_conditioning_states(
+        payload("CgQIARABCgQIBRABCgQIBRACCgQIBxABCgQIBxACCgQICBABCgQIChAB")
+    )
+    assert [
+        (state.component_code, state.conditioning_type_code) for state in seats.states
+    ] == [
+        (1, 1),
+        (5, 1),
+        (5, 2),
+        (7, 1),
+        (7, 2),
+        (8, 1),
+        (10, 1),
+    ]
 
 
 _CLOSED_CLOSURES_PAYLOAD = (
