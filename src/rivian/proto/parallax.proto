@@ -129,6 +129,47 @@ message CabinTemperatures {
   optional float interior_c = 3;
 }
 
+message HvacSettingsStatus {
+  optional float target_temperature_c = 1;
+}
+
+message PetModeStatus {
+  optional int32 state_code = 1;
+  optional int32 temperature_status_code = 3;
+}
+
+message CabinVentilationSetting {
+  optional int32 setting_code = 1;
+}
+
+message ClimateHoldSetting {
+  optional int32 duration_seconds = 1;
+}
+
+message TimestampSeconds {
+  optional int64 seconds = 1;
+}
+
+message ClimateHoldStatus {
+  optional int32 status_code = 1;
+  optional int32 availability_code = 2;
+  optional int32 unavailability_reason_code = 3;
+  optional TimestampSeconds hold_end_time = 4;
+}
+
+message DefrostDefogStatus {
+  optional int32 status_code = 1;
+}
+
+message SeatConditioningState {
+  optional int32 component_code = 1;
+  optional int32 conditioning_type_code = 2;
+}
+
+message SeatConditioningStates {
+  repeated SeatConditioningState states = 1;
+}
+
 message ChargingSessionStatus {
   optional int32 plug_connection_status_code = 1;
   optional int32 display_status_code = 2;

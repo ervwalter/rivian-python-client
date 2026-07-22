@@ -170,6 +170,67 @@ class CabinTemperatures:
 
 
 @dataclass(frozen=True, slots=True)
+class HvacSettingsStatus:
+    """Read-only cabin HVAC settings telemetry."""
+
+    target_temperature_c: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class PetModeStatus:
+    """Pet mode state and temperature-status codes."""
+
+    state_code: int | None
+    temperature_status_code: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class CabinVentilationSetting:
+    """Cabin ventilation setting as its wire-level numeric code."""
+
+    setting_code: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class ClimateHoldSetting:
+    """Configured climate-hold duration."""
+
+    duration_seconds: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class ClimateHoldStatus:
+    """Climate-hold status, availability, and end time."""
+
+    status_code: int | None
+    availability_code: int | None
+    unavailability_reason_code: int | None
+    hold_end_timestamp_ms: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class DefrostDefogStatus:
+    """Defrost/defog state as its wire-level numeric code."""
+
+    status_code: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class SeatConditioningState:
+    """One seat-conditioning record using observed wire-level codes."""
+
+    component_code: int | None
+    conditioning_type_code: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class SeatConditioningStates:
+    """Seat-conditioning records."""
+
+    states: tuple[SeatConditioningState, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ChargingSessionStatus:
     """Charging connection and display status codes."""
 
@@ -237,6 +298,13 @@ ParallaxData = (
     | BodyStates
     | CabinPreconditioningStatus
     | CabinTemperatures
+    | HvacSettingsStatus
+    | PetModeStatus
+    | CabinVentilationSetting
+    | ClimateHoldSetting
+    | ClimateHoldStatus
+    | DefrostDefogStatus
+    | SeatConditioningStates
     | ChargingSessionStatus
     | ChargingTimeEstimation
     | ChargingSessionLiveData
@@ -451,6 +519,71 @@ def decode_cabin_temperatures(payload: bytes) -> CabinTemperatures:
     )
 
 
+def decode_hvac_settings_status(payload: bytes) -> HvacSettingsStatus:
+    """Decode ``comfort.cabin.hvac_settings_status``."""
+    message = _parse(payload, parallax_pb2.HvacSettingsStatus)
+    return HvacSettingsStatus(
+        target_temperature_c=_optional(message, "target_temperature_c"),
+    )
+
+
+def decode_pet_mode_status(payload: bytes) -> PetModeStatus:
+    """Decode ``comfort.cabin.pet_mode_status``."""
+    message = _parse(payload, parallax_pb2.PetModeStatus)
+    return PetModeStatus(
+        state_code=_optional(message, "state_code"),
+        temperature_status_code=_optional(message, "temperature_status_code"),
+    )
+
+
+def decode_cabin_ventilation_setting(payload: bytes) -> CabinVentilationSetting:
+    """Decode ``comfort.cabin.cabin_ventilation_setting``."""
+    message = _parse(payload, parallax_pb2.CabinVentilationSetting)
+    return CabinVentilationSetting(setting_code=_optional(message, "setting_code"))
+
+
+def decode_climate_hold_setting(payload: bytes) -> ClimateHoldSetting:
+    """Decode ``comfort.cabin.climate_hold_setting``."""
+    message = _parse(payload, parallax_pb2.ClimateHoldSetting)
+    return ClimateHoldSetting(duration_seconds=_optional(message, "duration_seconds"))
+
+
+def decode_climate_hold_status(payload: bytes) -> ClimateHoldStatus:
+    """Decode ``comfort.cabin.climate_hold_status``."""
+    message = _parse(payload, parallax_pb2.ClimateHoldStatus)
+    end_seconds = (
+        _optional(message.hold_end_time, "seconds")
+        if message.HasField("hold_end_time")
+        else None
+    )
+    return ClimateHoldStatus(
+        status_code=_optional(message, "status_code"),
+        availability_code=_optional(message, "availability_code"),
+        unavailability_reason_code=_optional(message, "unavailability_reason_code"),
+        hold_end_timestamp_ms=end_seconds * 1000 if end_seconds is not None else None,
+    )
+
+
+def decode_defrost_defog_status(payload: bytes) -> DefrostDefogStatus:
+    """Decode ``comfort.cabin.defrost_defog_status``."""
+    message = _parse(payload, parallax_pb2.DefrostDefogStatus)
+    return DefrostDefogStatus(status_code=_optional(message, "status_code"))
+
+
+def decode_seat_conditioning_states(payload: bytes) -> SeatConditioningStates:
+    """Decode ``comfort.cabin.seat_conditioning_status``."""
+    message = _parse(payload, parallax_pb2.SeatConditioningStates)
+    return SeatConditioningStates(
+        states=tuple(
+            SeatConditioningState(
+                component_code=_optional(state, "component_code"),
+                conditioning_type_code=_optional(state, "conditioning_type_code"),
+            )
+            for state in message.states
+        )
+    )
+
+
 def decode_charging_session_status(payload: bytes) -> ChargingSessionStatus:
     """Decode ``charging.session.status``."""
     message = _parse(payload, parallax_pb2.ChargingSessionStatus)
@@ -524,6 +657,13 @@ _DECODERS: dict[str, Callable[[bytes], ParallaxData]] = {
     "body.locks.states": decode_body_states,
     "comfort.cabin.cabin_preconditioning_status": (decode_cabin_preconditioning_status),
     "comfort.cabin.cabin_temperatures": decode_cabin_temperatures,
+    "comfort.cabin.hvac_settings_status": decode_hvac_settings_status,
+    "comfort.cabin.pet_mode_status": decode_pet_mode_status,
+    "comfort.cabin.cabin_ventilation_setting": decode_cabin_ventilation_setting,
+    "comfort.cabin.climate_hold_setting": decode_climate_hold_setting,
+    "comfort.cabin.climate_hold_status": decode_climate_hold_status,
+    "comfort.cabin.defrost_defog_status": decode_defrost_defog_status,
+    "comfort.cabin.seat_conditioning_status": decode_seat_conditioning_states,
     "charging.session.status": decode_charging_session_status,
     "charging.session.time_estimation": decode_charging_time_estimation,
     "energy_edge_compute.graphs.charge_session_breakdown": (
