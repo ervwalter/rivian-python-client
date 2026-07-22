@@ -19,6 +19,8 @@ from rivian import (
     decode_charging_session_status,
     decode_charging_time_estimation,
     decode_high_voltage_battery_state,
+    decode_navigation_trip_info,
+    decode_navigation_trip_progress,
     decode_parallax_message,
     decode_parallax_payload,
     decode_tire_states,
@@ -59,16 +61,51 @@ def test_decode_vehicle_dynamics() -> None:
     assert decode_vehicle_odometer(payload("CPIB")).distance_km == 242
 
     gnss = decode_vehicle_gnss(
-        payload("CQAAAAAAAERAEQAAAAAAwFLAGQAAAAAA4F5AUIDQlf+8MQ==")
+        payload("CQAAAAAAAERAEQAAAAAAwFLAGQAAAAAA4F5AJQAA3EEtAAA0wlCA0JX/vDE=")
     )
     assert math.isclose(gnss.latitude or 0, 40.0)
     assert math.isclose(gnss.longitude or 0, -75.0)
     assert math.isclose(gnss.altitude_m or 0, 123.5)
+    assert math.isclose(gnss.speed_m_s or 0, 27.5)
+    assert math.isclose(gnss.heading_deg or 0, -45.0)
     assert gnss.gps_timestamp_ms == 1_700_000_000_000
     assert gnss.timestamp_ms == 2_015_964_782_000
     assert decode_vehicle_power_state(payload("CAM=")).state_code == 3
     assert decode_vehicle_gear(payload("CAE=")).state_code == 1
     assert decode_vehicle_drive_mode(payload("CAI=")).mode_code == 2
+
+
+def test_decode_navigation() -> None:
+    """Decode verified active-route progress, motion, destination, and ETA."""
+    progress = decode_navigation_trip_progress(
+        payload(
+            "IQAAAACAHMhAKQAAAAAAIIxAMiUKEgkAAAAAAABEQBEAAAAAAMBSwBUAANxBHQAANMIogNCV/7wx"
+        )
+    )
+    assert progress.remaining_distance_m == 12_345
+    assert progress.remaining_drive_time_s == 900
+    assert progress.motion is not None
+    assert progress.motion.latitude == 40
+    assert progress.motion.longitude == -75
+    assert progress.motion.speed_m_s == 27.5
+    assert progress.motion.heading_deg == -45
+    assert progress.motion.timestamp_ms == 1_700_000_000_000
+
+    info = decode_navigation_trip_info(
+        payload("CgZ0cmlwLTEaIBoeChwKEgkAAAAAAABEQBEAAAAAAMBSwBgCIgRIb21lMgYIhOnPqgY=")
+    )
+    assert info.trip_id == "trip-1"
+    assert info.destination_name == "Home"
+    assert info.destination_latitude == 40
+    assert info.destination_longitude == -75
+    assert info.eta_timestamp_ms == 1_700_000_900_000
+
+    empty_progress = decode_navigation_trip_progress(b"")
+    empty_info = decode_navigation_trip_info(b"")
+    assert empty_progress.remaining_distance_m is None
+    assert empty_progress.motion is None
+    assert empty_info.trip_id is None
+    assert empty_info.destination_name is None
 
 
 def test_decode_tires() -> None:
